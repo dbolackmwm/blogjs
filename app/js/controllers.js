@@ -1,14 +1,31 @@
-appControllers.controller('PostListCtrl', ['$scope', '$sce', 'PostService',
-    function PostListCtrl($scope, $sce, PostService) {
+
+appControllers.controller('PostListCtrl', ['$scope', '$sce', '$window', 'PostService',
+    function PostListCtrl($scope, $sce, $window, PostService) {
 
         $scope.posts = [];
-
+		var userTags = $window.sessionStorage.tags.toUpperCase().split(',');
+		var filtered = [];
         PostService.findAllPublished().success(function(data) {
             for (var postKey in data) {
-                data[postKey].content = $sce.trustAsHtml(data[postKey].content);
+           		var Found=false
+            	for ( var userTagsLoop=0; userTagsLoop < userTags.length; userTagsLoop++ )
+            	{
+            		var compareKeys = []
+            		for( var tagKey in data[postKey].tags )
+            			compareKeys[tagKey] = data[postKey].tags[tagKey].toUpperCase();
+            		if ( compareKeys.indexOf(userTags[userTagsLoop]) > -1 )
+            		{
+	            		Found = true;
+            		}
+            	}
+        		if ( Found )
+        		{
+        			filtered.push( data[postKey] );
+        			filtered[ filtered.length -1 ].content = $sce.trustAsHtml( filtered[ filtered.length -1 ].content ); 
+	            }
             }
 
-            $scope.posts = data;            
+            $scope.posts = filtered;            
         }).error(function(data, status) {
             console.log(status);
             console.log(data);
@@ -221,13 +238,11 @@ appControllers.controller('AdminUserCtrl', ['$scope', '$location', '$window', 'U
             }
         }
 
-        $scope.register = function register(username, password, passwordConfirm) {
+        $scope.register = function register(username, password, passwordConfirm, tags ) {
             if (AuthenticationService.isAuthenticated) {
-                $location.path("/admin");
-            }
-            else {
-                UserService.register(username, password, passwordConfirm).success(function(data) {
-                    $location.path("/admin/login");
+                UserService.register(username, password, passwordConfirm, tags ).success(function(data) {
+                    $location.path("/admin");
+                    //$location.path("/admin/login");
                 }).error(function(status, data) {
                     console.log(status);
                     console.log(data);
@@ -237,12 +252,76 @@ appControllers.controller('AdminUserCtrl', ['$scope', '$location', '$window', 'U
     }
 ]);
 
+appControllers.controller('UserUserCtrl', ['$scope', '$location', '$window', 'UserService', 'AuthenticationService',  
+    function UserUserCtrl($scope, $location, $window, UserService, AuthenticationService) {
 
-appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$sce', 'PostService',
-    function PostListTagCtrl($scope, $routeParams, $sce, PostService) {
+        //User User Controller (signIn, logOut)
+        $scope.signIn = function signIn(username, password) {
+            if (username != null && password != null) {
+                UserService.signIn(username, password).success(function(data) {
+                    AuthenticationService.isAuthenticated = true;
+                    $window.sessionStorage.token = data.token;
+                    $window.sessionStorage.tags = data.tags;
+                    $location.path("/");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+        }
+
+        $scope.logOut = function logOut() {
+            if (AuthenticationService.isAuthenticated) {
+                
+                UserService.logOut().success(function(data) {
+                    AuthenticationService.isAuthenticated = false;
+                    delete $window.sessionStorage.token;
+                    $location.path("/");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+            else {
+                $location.path("/login");
+            }
+        }
+
+        $scope.register = function register(username, password, passwordConfirm, tags ) {
+            if (AuthenticationService.isAuthenticated) {
+                UserService.register(username, password, passwordConfirm, tags ).success(function(data) {
+                    $location.path("/login");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+            else {
+                $location.path("/admin");
+            }
+        }
+    }
+]);
+
+
+
+appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$window', '$sce', 'PostService',
+    function PostListTagCtrl($scope, $routeParams, $window, $sce, PostService) {
 
         $scope.posts = [];
-        var tagName = $routeParams.tagName;
+        var tagName = ""
+        if ( $routeParams.tagName )
+        {
+        	tagName = $routeParams.tagName
+        }
+        else if( $window.sessionStorage.tags )
+        {
+        	tagName = $window.sessionStorage.tags;
+        }
+        if ( tagName.length !=1 )
+        {
+        	tagName = "anotherTag";
+        }
 
         PostService.findByTag(tagName).success(function(data) {
             for (var postKey in data) {
@@ -256,4 +335,3 @@ appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$sce', 
 
     }
 ]);
-

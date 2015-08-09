@@ -4,11 +4,16 @@ var secret = require('../config/secret');
 var redisClient = require('../config/redis_database').redisClient;
 var tokenManager = require('../config/token_manager');
 
+var util = require( 'util');
+
 exports.signin = function(req, res) {
 	var username = req.body.username || '';
 	var password = req.body.password || '';
 	
+	console.log( "Attempting " + util.inspect(req.body ));
+	
 	if (username == '' || password == '') { 
+		console.log("EMPTY");
 		return res.send(401); 
 	}
 
@@ -19,6 +24,7 @@ exports.signin = function(req, res) {
 		}
 
 		if (user == undefined) {
+			console.log("Undefined User");
 			return res.send(401);
 		}
 		
@@ -29,8 +35,8 @@ exports.signin = function(req, res) {
             }
 
 			var token = jwt.sign({id: user._id}, secret.secretToken, { expiresInMinutes: tokenManager.TOKEN_EXPIRATION });
-			
-			return res.json({token:token});
+			console.log( "Succeeded! - returning token: " + token + " and tags: " + user.tags );
+			return res.json({token:token,tags:user.tags});
 		});
 
 	});
@@ -52,7 +58,11 @@ exports.register = function(req, res) {
 	var username = req.body.username || '';
 	var password = req.body.password || '';
 	var passwordConfirmation = req.body.passwordConfirmation || '';
-
+	
+	var tags = req.body.tags.split(' ');
+	
+	console.log("Attempting a register!");
+	
 	if (username == '' || password == '' || password != passwordConfirmation) {
 		return res.send(400);
 	}
@@ -60,6 +70,7 @@ exports.register = function(req, res) {
 	var user = new db.userModel();
 	user.username = username;
 	user.password = password;
+	user.tags = tags;
 
 	user.save(function(err) {
 		if (err) {
@@ -74,7 +85,7 @@ exports.register = function(req, res) {
 			}
 
 			if (counter == 1) {
-				db.userModel.update({username:user.username}, {is_admin:true}, function(err, nbRow) {
+				db.userModel.update({username:user.username}, {is_admin:true}, {tags:tags}, function(err, nbRow) {
 					if (err) {
 						console.log(err);
 						return res.send(500);
@@ -85,6 +96,7 @@ exports.register = function(req, res) {
 				});
 			} 
 			else {
+				console.log(" Returning success!");
 				return res.send(200);
 			}
 		});

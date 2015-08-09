@@ -34,7 +34,7 @@ appServices.factory('TokenInterceptor', function ($q, $window, $location, Authen
             if (rejection != null && rejection.status === 401 && ($window.sessionStorage.token || AuthenticationService.isAuthenticated)) {
                 delete $window.sessionStorage.token;
                 AuthenticationService.isAuthenticated = false;
-                $location.path("/admin/login");
+                $location.path("/login");
             }
 
             return $q.reject(rejection);
@@ -96,8 +96,8 @@ appServices.factory('UserService', function ($http) {
             return $http.get(options.api.base_url + '/user/logout');
         },
 
-        register: function(username, password, passwordConfirmation) {
-            return $http.post(options.api.base_url + '/user/register', {username: username, password: password, passwordConfirmation: passwordConfirmation });
+        register: function(username, password, passwordConfirmation, tags) {
+            return $http.post(options.api.base_url + '/user/register', {username: username, password: password, passwordConfirmation: passwordConfirmation, tags: tags });
         }
     }
 });

@@ -16,34 +16,53 @@ app.config(['$locationProvider', '$routeProvider',
     $routeProvider.
         when('/', {
             templateUrl: 'partials/post.list.html',
-            controller: 'PostListCtrl'
+            controller: 'PostListCtrl',
+            access: { requiredAuthentication: true }
+        }).
+        when('/signin', {
+            templateUrl: 'partials/user.signin.html',
+            controller: 'UserUserCtrl',
+            access: { requiredAuthentication: true }
+        }).
+        when('/signout', {
+            templateUrl: 'partials/user.logout.html',
+            controller: 'UserUserCtrl',
+            access: { requiredAuthentication: true }
         }).
         when('/post/:id', {
             templateUrl: 'partials/post.view.html',
-            controller: 'PostViewCtrl'
+            controller: 'PostViewCtrl',
+            access: { requiredAuthentication: true }
         }).
         when('/tag/:tagName', {
             templateUrl: 'partials/post.list.html',
-            controller: 'PostListTagCtrl'
+            controller: 'PostListTagCtrl',
+            access: { requiredAuthentication: true }
         }).
         when('/admin', {
             templateUrl: 'partials/admin.post.list.html',
             controller: 'AdminPostListCtrl',
-            access: { requiredAuthentication: true }
+            access: { requiredAdminAuthentication: true }
         }).
         when('/admin/post/create', {
             templateUrl: 'partials/admin.post.create.html',
             controller: 'AdminPostCreateCtrl',
-            access: { requiredAuthentication: true }
+            access: { requiredAdminAuthentication: true }
         }).
         when('/admin/post/edit/:id', {
             templateUrl: 'partials/admin.post.edit.html',
             controller: 'AdminPostEditCtrl',
-            access: { requiredAuthentication: true }
+            access: { requiredAdminAuthentication: true }
         }).
-        when('/admin/register', {
-            templateUrl: 'partials/admin.register.html',
-            controller: 'AdminUserCtrl'
+        when('/admin/user/', {
+            templateUrl: 'partials/admin.user.list.html',
+            controller: 'AdminUserCtrl',
+            access: { requiredAdminAuthentication: true }
+        }).
+        when('/admin/usercreate/', {
+            templateUrl: 'partials/admin.usercreate.html',
+            controller: 'UserUserCtrl',
+            access: { requiredAdminAuthentication: true }
         }).
         when('/admin/login', {
             templateUrl: 'partials/admin.signin.html',
@@ -52,7 +71,7 @@ app.config(['$locationProvider', '$routeProvider',
         when('/admin/logout', {
             templateUrl: 'partials/admin.logout.html',
             controller: 'AdminUserCtrl',
-            access: { requiredAuthentication: true }
+            access: { requiredAdminAuthentication: true }
         }).
         otherwise({
             redirectTo: '/'
@@ -70,21 +89,43 @@ app.run(function($rootScope, $location, $window, AuthenticationService) {
         if (nextRoute != null && nextRoute.access != null && nextRoute.access.requiredAuthentication 
             && !AuthenticationService.isAuthenticated && !$window.sessionStorage.token) {
 
+            $location.path("/signin");
+        }
+        else if (nextRoute != null && nextRoute.access != null && nextRoute.access.requiredAdminAuthentication 
+            && !AuthenticationService.isAuthenticated && !$window.sessionStorage.token) {
+
             $location.path("/admin/login");
         }
     });
 });
-appControllers.controller('PostListCtrl', ['$scope', '$sce', 'PostService',
-    function PostListCtrl($scope, $sce, PostService) {
+
+appControllers.controller('PostListCtrl', ['$scope', '$sce', '$window', 'PostService',
+    function PostListCtrl($scope, $sce, $window, PostService) {
 
         $scope.posts = [];
-
+		var userTags = $window.sessionStorage.tags.toUpperCase().split(',');
+		var filtered = [];
         PostService.findAllPublished().success(function(data) {
             for (var postKey in data) {
-                data[postKey].content = $sce.trustAsHtml(data[postKey].content);
+           		var Found=false
+            	for ( var userTagsLoop=0; userTagsLoop < userTags.length; userTagsLoop++ )
+            	{
+            		var compareKeys = []
+            		for( var tagKey in data[postKey].tags )
+            			compareKeys[tagKey] = data[postKey].tags[tagKey].toUpperCase();
+            		if ( compareKeys.indexOf(userTags[userTagsLoop]) > -1 )
+            		{
+	            		Found = true;
+            		}
+            	}
+        		if ( Found )
+        		{
+        			filtered.push( data[postKey] );
+        			filtered[ filtered.length -1 ].content = $sce.trustAsHtml( filtered[ filtered.length -1 ].content ); 
+	            }
             }
 
-            $scope.posts = data;            
+            $scope.posts = filtered;            
         }).error(function(data, status) {
             console.log(status);
             console.log(data);
@@ -297,13 +338,11 @@ appControllers.controller('AdminUserCtrl', ['$scope', '$location', '$window', 'U
             }
         }
 
-        $scope.register = function register(username, password, passwordConfirm) {
+        $scope.register = function register(username, password, passwordConfirm, tags ) {
             if (AuthenticationService.isAuthenticated) {
-                $location.path("/admin");
-            }
-            else {
-                UserService.register(username, password, passwordConfirm).success(function(data) {
-                    $location.path("/admin/login");
+                UserService.register(username, password, passwordConfirm, tags ).success(function(data) {
+                    $location.path("/admin");
+                    //$location.path("/admin/login");
                 }).error(function(status, data) {
                     console.log(status);
                     console.log(data);
@@ -313,12 +352,76 @@ appControllers.controller('AdminUserCtrl', ['$scope', '$location', '$window', 'U
     }
 ]);
 
+appControllers.controller('UserUserCtrl', ['$scope', '$location', '$window', 'UserService', 'AuthenticationService',  
+    function UserUserCtrl($scope, $location, $window, UserService, AuthenticationService) {
 
-appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$sce', 'PostService',
-    function PostListTagCtrl($scope, $routeParams, $sce, PostService) {
+        //User User Controller (signIn, logOut)
+        $scope.signIn = function signIn(username, password) {
+            if (username != null && password != null) {
+                UserService.signIn(username, password).success(function(data) {
+                    AuthenticationService.isAuthenticated = true;
+                    $window.sessionStorage.token = data.token;
+                    $window.sessionStorage.tags = data.tags;
+                    $location.path("/");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+        }
+
+        $scope.logOut = function logOut() {
+            if (AuthenticationService.isAuthenticated) {
+                
+                UserService.logOut().success(function(data) {
+                    AuthenticationService.isAuthenticated = false;
+                    delete $window.sessionStorage.token;
+                    $location.path("/");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+            else {
+                $location.path("/login");
+            }
+        }
+
+        $scope.register = function register(username, password, passwordConfirm, tags ) {
+            if (AuthenticationService.isAuthenticated) {
+                UserService.register(username, password, passwordConfirm, tags ).success(function(data) {
+                    $location.path("/login");
+                }).error(function(status, data) {
+                    console.log(status);
+                    console.log(data);
+                });
+            }
+            else {
+                $location.path("/admin");
+            }
+        }
+    }
+]);
+
+
+
+appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$window', '$sce', 'PostService',
+    function PostListTagCtrl($scope, $routeParams, $window, $sce, PostService) {
 
         $scope.posts = [];
-        var tagName = $routeParams.tagName;
+        var tagName = ""
+        if ( $routeParams.tagName )
+        {
+        	tagName = $routeParams.tagName
+        }
+        else if( $window.sessionStorage.tags )
+        {
+        	tagName = $window.sessionStorage.tags;
+        }
+        if ( tagName.length !=1 )
+        {
+        	tagName = "anotherTag";
+        }
 
         PostService.findByTag(tagName).success(function(data) {
             for (var postKey in data) {
@@ -332,7 +435,6 @@ appControllers.controller('PostListTagCtrl', ['$scope', '$routeParams', '$sce', 
 
     }
 ]);
-
 
 appDirectives.directive('displayMessage', function() {
 	return {
@@ -388,7 +490,7 @@ appServices.factory('TokenInterceptor', function ($q, $window, $location, Authen
             if (rejection != null && rejection.status === 401 && ($window.sessionStorage.token || AuthenticationService.isAuthenticated)) {
                 delete $window.sessionStorage.token;
                 AuthenticationService.isAuthenticated = false;
-                $location.path("/admin/login");
+                $location.path("/login");
             }
 
             return $q.reject(rejection);
@@ -450,8 +552,8 @@ appServices.factory('UserService', function ($http) {
             return $http.get(options.api.base_url + '/user/logout');
         },
 
-        register: function(username, password, passwordConfirmation) {
-            return $http.post(options.api.base_url + '/user/register', {username: username, password: password, passwordConfirmation: passwordConfirmation });
+        register: function(username, password, passwordConfirmation, tags) {
+            return $http.post(options.api.base_url + '/user/register', {username: username, password: password, passwordConfirmation: passwordConfirmation, tags: tags });
         }
     }
 });

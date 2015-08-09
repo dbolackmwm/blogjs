@@ -1,0 +1,33 @@
+<section class="post">
+    <ol class="breadcrumb">
+        <li><a href="#/">Blog</a></li>
+        <li class="active">User Administration</li>
+    </ol>
+
+    <div class="alert alert-danger" ng-show="message.is_error">{{message.message}}</div>
+    <div class="alert alert-success" ng-show="message.is_success">{{message.message}}</div>
+
+    <a href="#/admin/user/create" class="btn btn-success" style="margin-bottom: 15px;">Create a new user</a>
+
+    <table class="table table-condensed table-hover">
+        <thead>
+            <tr>
+                <th>Login</th>
+                <th>Email</th>
+                <th>Reward Levels</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody> 
+            <tr ng-repeat="post in posts">
+                <td>{{user.name}}</td>
+                <td>{{user.email}}</td>
+                <td>{{user.rewards}}</td>
+                <td>
+                    <button class="btn btn-danger btn-xs" ng-click="deleteUser(user._id)"><span class="glyphicon glyphicon-trash"></span></button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+</section>
